@@ -8,9 +8,7 @@ import 'package:la_logika/service/expense_service.dart';
 import 'package:la_logika/widgets/Expenses.dart';
 import 'package:la_logika/widgets/balanceCart.dart';
 import 'package:la_logika/widgets/buttonCategory.dart';
-import 'package:la_logika/widgets/list_category.dart';
 import 'package:la_logika/widgets/navigationbutton.dart';
-import 'package:la_logika/widgets/pie_chart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Home extends StatefulWidget {
@@ -108,13 +106,22 @@ class _HomeState extends State<Home> {
   }
 
   void Logout() async {
+  try {
     final supabase = Supabase.instance.client;
     await supabase.auth.signOut();
-    Navigator.pushReplacement(
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
     );
+    
+  } catch (e) {
+    debugPrint("Error saat logout: $e");
   }
+}
 
 Future<void> Addbalance() async {
   try {

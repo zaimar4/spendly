@@ -10,13 +10,13 @@ class Expenses extends StatelessWidget {
   IconData getIconkategori(String kategori) {
     switch (kategori) {
       case "Primary":
-        return Icons.home;
+        return Icons.home_outlined;
       case "Secondary":
-        return Icons.shopping_cart;
+        return Icons.shopping_bag_outlined;
       case "LifeStyle":
-        return Icons.sports_esports;
+        return Icons.sports_esports_outlined;
       default:
-        return Icons.category;
+        return Icons.category_outlined;
     }
   }
 

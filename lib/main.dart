@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:la_logika/pages/home.dart';
 import 'package:la_logika/pages/login.dart';
-import 'package:la_logika/pages/register.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'pages/slide.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
