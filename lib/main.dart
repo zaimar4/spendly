@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:la_logika/pages/login.dart';
+import 'package:la_logika/pages/slide.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-
-Future<void> main() async {
+void main() async {
+  // 1. Pastikan binding Flutter sudah siap
   WidgetsFlutterBinding.ensureInitialized();
 
-  await initializeDateFormatting('id_ID', null);
+  try {
+    // 2. Load file .env
+    await dotenv.load(fileName: ".env");
 
-  await Supabase.initialize(
-    url: 'https://qlcvcdrrqgmbljcppcgv.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsY3ZjZHJycWdtYmxqY3BwY2d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwOTY5NDgsImV4cCI6MjA4NjY3Mjk0OH0.uMAi_5cDNaK3l6efQpttqu8f7ssU9Ll_mEJV2fxzoJo',
-  );
+    await initializeDateFormatting('id_ID', null);
+
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL'] ?? '', 
+      anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    );
+  } catch (e) {
+    debugPrint("Error saat inisialisasi: $e");
+  }
 
   runApp(const MyApp());
 }
@@ -22,9 +30,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home:LoginPage()
+      home: Slide(),
     );
   }
 }

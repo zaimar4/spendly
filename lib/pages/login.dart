@@ -3,7 +3,6 @@ import 'package:la_logika/pages/home.dart';
 import 'package:la_logika/pages/register.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -13,62 +12,103 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final supabase = Supabase.instance.client;
-  final TextEditingController email =  TextEditingController();
-  final TextEditingController password =  TextEditingController();
-
- Future<void> login() async {
-  try {
+  final TextEditingController email = TextEditingController();
+  final TextEditingController password = TextEditingController();
   
-    final response = await supabase.auth.signInWithPassword(
-      email: email.text.trim(),
-      password: password.text.trim(),
-    );
+  // State untuk mencegah freeze dan memberi feedback ke user
+  bool isLoading = false;
 
-    final user = response.user;
-
-    if (user == null) {
-      throw Exception("Login gagal");
+  Future<void> login() async {
+    // 1. Validasi input kosong
+    if (email.text.isEmpty || password.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Email dan password tidak boleh kosong!")),
+      );
+      return;
     }
 
-    
-    final data = await supabase
-        .from('profiles') 
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
+    setState(() => isLoading = true);
 
-    if (data == null) {
-      throw Exception("Profile belum ada. Silakan register ulang.");
-    }
+    try {
+      // 2. Proses Login ke Supabase
+      final response = await supabase.auth.signInWithPassword(
+        email: email.text.trim(),
+        password: password.text.trim(),
+      );
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Home(
-          namaUser: data['nama'],
-          balance: (data['balance'] as num).toDouble(),
+      final user = response.user;
+      if (user == null) throw Exception("User tidak ditemukan");
+
+      // 3. Ambil data profil (Nama & Saldo)
+      final data = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (data == null) {
+        throw Exception("Profil tidak ditemukan. Silakan register ulang.");
+      }
+
+      if (!mounted) return;
+
+      // 4. Navigasi ke Home (Hapus history agar tidak bisa back ke login)
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Home(
+            namaUser: data['nama'] ?? "User",
+            balance: (data['balance'] ?? 0 as num).toDouble(),
+          ),
         ),
-      ),
-    );
+        (route) => false,
+      );
 
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Login gagal: $e")),
-    );
+    } on AuthException catch (e) {
+      // 5. UBAH PESAN ERROR SUPABASE KE BAHASA INDONESIA
+      String pesanKustom = "Gagal masuk: Periksa kembali akunmu";
+
+      if (e.message.contains("Invalid login credentials")) {
+        pesanKustom = "Email atau kata sandi salah, nih. Coba cek lagi.";
+      } else if (e.message.contains("Email not confirmed")) {
+        pesanKustom = "Email kamu belum dikonfirmasi. Cek kotak masuk emailmu ya.";
+      } else if (e.message.contains("Too many requests")) {
+        pesanKustom = "Terlalu banyak mencoba login. Tunggu sebentar ya, Boss.";
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(pesanKustom),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (e) {
+      // 6. Error umum (koneksi internet/server)
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Koneksi bermasalah. Pastikan internetmu aktif!"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } finally {
+      // Matikan loading spinner
+      if (mounted) setState(() => isLoading = false);
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon
+              // Icon Header
               const CircleAvatar(
                 radius: 35,
                 backgroundColor: Colors.green,
@@ -77,7 +117,6 @@ class _LoginPageState extends State<LoginPage> {
 
               const SizedBox(height: 20),
 
-              // Title
               const Text(
                 "Login Account",
                 style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
@@ -88,6 +127,7 @@ class _LoginPageState extends State<LoginPage> {
               // Email Field
               TextField(
                 controller: email,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.email),
                   hintText: "Email",
@@ -114,7 +154,7 @@ class _LoginPageState extends State<LoginPage> {
 
               const SizedBox(height: 30),
 
-              // Button Login
+              // Tombol Login dengan Loading Spinner
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -125,22 +165,35 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(15),
                     ),
                   ),
-                  onPressed:login,
-                  child: const Text("Login", style: TextStyle(fontSize: 16,color: Colors.white)),
+                  onPressed: isLoading ? null : login,
+                  child: isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          "Login",
+                          style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // Back to Register
+              // Link ke Register
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text("Belum punya akun? "),
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(context,
-                      MaterialPageRoute(builder: (context) => Register_Page())
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const Register_Page()),
                       );
                     },
                     child: const Text(

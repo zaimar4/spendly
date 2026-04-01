@@ -12,6 +12,12 @@ class _SlideState extends State<Slide> {
   final PageController _controller = PageController();
   int currentPage = 0;
 
+  @override
+  void dispose() {
+    _controller.dispose(); // Memastikan memory bersih saat pindah halaman
+    super.dispose();
+  }
+
   void nextPage() {
     if (currentPage < 2) {
       _controller.nextPage(
@@ -21,58 +27,89 @@ class _SlideState extends State<Slide> {
     }
   }
 
+  void skipToTarget() {
+    _controller.animateToPage(
+      2,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
 
-void skipToTarget() {
-  _controller.animateToPage(
-    2, // index slide target
-    duration: const Duration(milliseconds: 400),
-    curve: Curves.easeInOut,
-  );
-}
-void finishOnboarding() {
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) =>  LoginPage(),
-    ),
-  );
-}
-
+  void finishOnboarding() {
+    // Navigasi yang aman: menghapus semua history slide agar tidak bisa back
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-         backgroundColor: const Color.fromARGB(255, 248, 255, 249),
-      body: PageView(
-        controller: _controller,
-        onPageChanged: (i) => setState(() => currentPage = i),
+      backgroundColor: const Color.fromARGB(255, 248, 255, 249),
+      body: Stack(
         children: [
-          buildSlide(
-            SlideIcon.wallet,
-            "Manage Your Expenses",
-            "Keep track of all your spending in one place with ease and simplicity.",
-            "Next",
-            nextPage,
+          // 1. PAGE VIEW (Konten Utama)
+          PageView(
+            controller: _controller,
+            onPageChanged: (i) => setState(() => currentPage = i),
+            children: [
+              buildSlide(
+                SlideIcon.wallet,
+                "Manage Your Expenses",
+                "Keep track of all your spending in one place with ease and simplicity.",
+                "Next",
+                nextPage,
+              ),
+              buildSlide(
+                SlideIcon.trending,
+                "Track Spending Habits",
+                "Understand where your money goes and make informed financial decisions.",
+                "Next",
+                nextPage,
+              ),
+              buildSlide(
+                SlideIcon.target,
+                "Improve Financial Awareness",
+                "Build better money habits and achieve your financial goals effortlessly.",
+                "Get Started",
+                finishOnboarding,
+                showSkip: false,
+              ),
+            ],
           ),
-          buildSlide(
-            SlideIcon.trending,
-            "Track Spending Habits",
-            "Understand where your money goes and make informed financial decisions.",
-            "Next",
-            nextPage,
-          ),
-          buildSlide(
-            SlideIcon.target,
-            "Improve Financial Awareness",
-            "Build better money habits and achieve your financial goals effortlessly.",
-            "Get Started",
-            finishOnboarding,
-            showSkip: false,
+
+          // 2. DOTS INDICATOR (Penanda Halaman)
+          Positioned(
+            bottom: 140, // Posisi di atas tombol utama
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                3,
+                (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 8,
+                  width: currentPage == index ? 24 : 8,
+                  decoration: BoxDecoration(
+                    color: currentPage == index
+                        ? const Color(0xFF34C971)
+                        : Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+
+  // ================= WIDGET BUILDER =================
 
   Widget buildSlide(
     SlideIcon iconType,
@@ -82,215 +119,106 @@ void finishOnboarding() {
     VoidCallback onPressed, {
     bool showSkip = true,
   }) {
-    return Center(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const Spacer(flex: 3),
           buildSlideIcon(iconType),
-          const SizedBox(height: 30),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF24302C),
-              ),
+          const SizedBox(height: 40),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF24302C),
             ),
           ),
           const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF6B7280),
+              height: 1.5,
             ),
           ),
-          const SizedBox(height: 60),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF34C971),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
+          const Spacer(flex: 2),
+          
+          // Tombol Utama
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF34C971),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                onPressed: onPressed,
-                child: Text(
-                  buttonText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              onPressed: onPressed,
+              child: Text(
+                buttonText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
 
-          showSkip
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 20),
-                  child: TextButton(
-                    onPressed: skipToTarget,
-                    style: TextButton.styleFrom(
-                      overlayColor: Colors.transparent,
-                      splashFactory: NoSplash.splashFactory,
-                    ),
-                    child: const Text(
-                      "Skip",
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                )
-              : const SizedBox(height: 48),
+          // Tombol Skip
+          if (showSkip)
+            TextButton(
+              onPressed: skipToTarget,
+              child: const Text(
+                "Skip",
+                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 16),
+              ),
+            )
+          else
+            const SizedBox(height: 48), // Padding bawah agar seimbang
+            
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  // ================= ICON =================
+  // ================= ICON HANDLER =================
 
   Widget buildSlideIcon(SlideIcon type) {
-    Widget iconWidget;
-
-    if (type == SlideIcon.wallet) {
-      iconWidget = const Icon(
-        size: 60,
-        Icons.account_balance_wallet_outlined,
-        color: Colors.white,
-      );
-    } else if (type == SlideIcon.trending) {
-      iconWidget = const Icon(
-        Icons.trending_down,
-        size: 60,
-        color: Colors.white,
-      );
-    } else {
-      iconWidget = CustomPaint(
-        size: const Size(60, 60),
-        painter: TargetPainter(),
-      );
-    }
+    IconData d;
+    if (type == SlideIcon.wallet) d = Icons.account_balance_wallet_outlined;
+    else if (type == SlideIcon.trending) d = Icons.trending_up;
+    else d = Icons.ads_click; // Ikon Target
 
     return Container(
-      width: 130,
-      height: 130,
-      decoration: iconBackground(type),
-      child: Center(child: iconWidget),
-    );
-  }
-
-
-  BoxDecoration iconBackground(SlideIcon type) {
-    if (type == SlideIcon.wallet) {
-      return const BoxDecoration(
+      width: 140,
+      height: 140,
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [Color(0xFF00F0B5), Color(0xFF1ED760)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      );
-    } else if (type == SlideIcon.trending) {
-      return const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF34C971), Color(0xFF00BFA5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF00E6B8), Color(0xFF00C2A8)],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black26,
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
+            color: const Color(0xFF34C971).withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
         ],
-      );
-    } else {
-      return const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF1ED760), Color(0xFF00C2A8)],
-        ),
-
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      );
-    }
+      ),
+      child: Icon(d, size: 60, color: Colors.white),
+    );
   }
 }
 
 enum SlideIcon { wallet, trending, target }
-
-class WalletPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
-
-    final r = RRect.fromRectAndRadius(
-      Rect.fromLTWH(6, 15, size.width - 12, size.height - 25),
-      const Radius.circular(8),
-    );
-
-    canvas.drawRRect(r, paint);
-    canvas.drawLine(
-      Offset(size.width * 0.65, size.height * 0.5),
-      Offset(size.width * 0.85, size.height * 0.5),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
-
-class TargetPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
-
-    canvas.drawCircle(size.center(Offset.zero), size.width / 2.5, paint);
-    canvas.drawCircle(size.center(Offset.zero), size.width / 4, paint);
-    canvas.drawCircle(
-      size.center(Offset.zero),
-      4,
-      Paint()..color = Colors.white,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
