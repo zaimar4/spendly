@@ -39,15 +39,35 @@ class ExpenseService {
       'kategori': kategori,
     });
   }
+// Di ExpenseService
+Future<void> addBalance({required double nilai}) async {
+  final user = supabase.auth.currentUser;
+  if (user == null) return;
 
-  Future<void> addBalance({required double nilai}) async {
+  await supabase.from('income').insert({
+    'user_id': user.id, 
+    'nilai': nilai,
+  });
+}
+// Di dalam class ExpenseService
+Future<List<Map<String, dynamic>>> getIncomes() async {
+  try {
     final user = supabase.auth.currentUser;
+    if (user == null) return [];
 
-    if (user == null) {
-      throw Exception("User not logged in");
-    }
 
-    await supabase.from('income').insert({'user_id': user.id, 'nilai': nilai});
+    final response = await supabase
+        .from('income') 
+        .select()
+        .eq('user_id', user.id) 
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
+  } catch (e) {
+    print("Error Get Incomes: $e");
+    return [];
+  }
+}
   }
 
-}
+

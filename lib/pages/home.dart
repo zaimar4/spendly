@@ -116,44 +116,38 @@ class _HomeState extends State<Home> {
     );
   }
 
- Future<void> Addbalance() async {
+Future<void> Addbalance() async {
   try {
-    if (addBalanceController.text.isEmpty) {
-      throw Exception("Isi nilai saldo dulu");
-    }
-
-    double jumlah =
-        double.tryParse(addBalanceController.text) ?? 0;
+    double jumlah = double.tryParse(addBalanceController.text) ?? 0;
 
     if (jumlah <= 0) {
       throw Exception("Nilai tidak valid");
     }
 
-    await expense_service.addBalance(nilai: jumlah);
+    await expense_service.addBalance(nilai: jumlah); 
+
+    expenses(); 
+    addBalanceController.clear();
+    Navigator.pop(context); 
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Balance added successfully")),
+      const SnackBar(content: Text("Saldo berhasil ditambahkan!")),
     );
-
-    addBalanceController.clear();
-
-    Navigator.pop(context, true);
   } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Failed: $e")),
+      SnackBar(content: Text("Gagal: $e")),
     );
   }
 }
+void showBalancepopup() {
 
-  void showBalancepopup() {
-    TextEditingController addBalancecontroler = TextEditingController();
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text("Add Your Balance"),
           content: TextField(
-            controller: addBalancecontroler,
+            controller: addBalanceController, 
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               hintText: "Input Saldo",
@@ -163,7 +157,10 @@ class _HomeState extends State<Home> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                addBalanceController.clear();
+                Navigator.pop(context);
+              },
               child: Text("Cancel"),
             ),
             ElevatedButton(
@@ -208,14 +205,15 @@ class _HomeState extends State<Home> {
           ),
 
           const SizedBox(height: 25),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: BalanceCard(
-              currentBalance: currentbalance - totalPengeluaran,
-              totalExpense: totalPengeluaran,
-              initialBalance: widget.balance,
-            ),
-          ),
+       Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 20),
+  child: BalanceCard(
+    // Sekarang gunakan currentbalance sebagai dasar saldo akhir
+    currentBalance: currentbalance - totalPengeluaran, 
+    totalExpense: totalPengeluaran,
+    initialBalance: currentbalance, // Tampilkan saldo saat ini sebagai initial
+  ),
+),
           const SizedBox(height: 15),
           Padding(
             padding: const EdgeInsets.all(15.0),

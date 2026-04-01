@@ -14,6 +14,7 @@ class _HistoryPageState extends State<HistoryPage> {
   final ExpenseService service = ExpenseService();
 
   List<Expense> expenses = [];
+  List<Map<String, dynamic>> incomes = [];
   bool isLoading = true;
 
   final rupiah = NumberFormat.currency(
@@ -29,22 +30,33 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> fetchData() async {
-    final data = await service.getExpenses();
-    setState(() {
-      expenses = data;
-      isLoading = false;
-    });
+    setState(() => isLoading = true);
+    try {
+      // Mengambil data Expense dan Income secara paralel
+      final results = await Future.wait([
+        service.getExpenses(),
+        service.getIncomes(),
+      ]);
+
+      setState(() {
+        expenses = results[0] as List<Expense>;
+        incomes = results[1] as List<Map<String, dynamic>>;
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Error fetchData: $e");
+      setState(() => isLoading = false);
+    }
   }
 
- 
+  // LOGIKA PERHITUNGAN
+  double get totalIncome =>
+      incomes.fold(0, (sum, item) => sum + (item['nilai'] ?? 0).toDouble());
+
   double get totalExpense =>
       expenses.fold(0, (sum, item) => sum + item.harga);
 
-  double get totalIncome => 0; 
-
   double get netBalance => totalIncome - totalExpense;
-
-  
 
   Color getCategoryColor(String kategori) {
     switch (kategori) {
@@ -53,12 +65,11 @@ class _HistoryPageState extends State<HistoryPage> {
       case "Secondary":
         return const Color(0xFF66BB6A);
       case "Lifestyle":
-        return const Color(0xFFA5D6A7);
+        return const Color(0xFF1B5E20);
       default:
-        return Colors.grey;
+        return Colors.blueGrey;
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -69,30 +80,24 @@ class _HistoryPageState extends State<HistoryPage> {
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          "History",
-          style: TextStyle(fontWeight: FontWeight.bold),
+          "Transaction History",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.filter_alt_outlined),
-          )
-        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                
+                // RINGKASAN ATAS
                 Row(
                   children: [
                     Expanded(
                       child: _summaryCard(
-                        title: "Total Income :",
+                        title: "Total Income",
                         amount: totalIncome,
-                        color: Colors.green,
-                        icon: Icons.arrow_upward,
+                        color: Colors.green.shade700,
+                        icon: Icons.add_chart,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -100,39 +105,29 @@ class _HistoryPageState extends State<HistoryPage> {
                       child: _summaryCard(
                         title: "Total Expenses",
                         amount: totalExpense,
-                        color: Colors.red,
-                        icon: Icons.arrow_downward,
+                        color: Colors.red.shade700,
+                        icon: Icons.pie_chart_outline,
                       ),
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 20),
-
-                // =============================
-                // MONTHLY SUMMARY
-                // =============================
                 _monthlySummaryCard(),
-
-                const SizedBox(height: 20),
+                const SizedBox(height: 25),
 
                 const Text(
                   "All Transactions",
-                  style:
-                      TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-
                 const SizedBox(height: 10),
 
+                // DAFTAR TRANSAKSI GABUNGAN
                 ..._groupedTransactions(),
               ],
             ),
     );
   }
-
-  // =============================
-  // SUMMARY CARD
-  // =============================
 
   Widget _summaryCard({
     required String title,
@@ -151,28 +146,26 @@ class _HistoryPageState extends State<HistoryPage> {
         children: [
           Text(title,
               style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Text(
-            rupiah.format(amount),
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold),
-          ),
+                  color: Colors.white70, fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
+          FittedBox(
+            child: Text(
+              rupiah.format(amount),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
-            child: Icon(icon, color: Colors.white),
+            child: Icon(icon, color: Colors.white38, size: 28),
           )
         ],
       ),
     );
   }
-
-  // =============================
-  // MONTHLY SUMMARY CARD
-  // =============================
 
   Widget _monthlySummaryCard() {
     return Container(
@@ -182,7 +175,7 @@ class _HistoryPageState extends State<HistoryPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           )
@@ -190,94 +183,98 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       child: Column(
         children: [
-          const Text(
-            "Monthly Summary",
-            style: TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 6),
+          const Text("Net Balance This Month",
+              style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 8),
           Text(
-            DateFormat('MMMM yyyy').format(DateTime.now()),
-            style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            rupiah.format(netBalance),
+            style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: netBalance >= 0 ? Colors.green.shade800 : Colors.red.shade800),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.green,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              "Net Balance: ${rupiah.format(netBalance)}",
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold),
-            ),
-          )
+          Text(
+            DateFormat('MMMM yyyy').format(DateTime.now()),
+            style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
+          ),
         ],
       ),
     );
   }
 
-  // =============================
-  // GROUPED TRANSACTIONS
-  // =============================
-
   List<Widget> _groupedTransactions() {
-    Map<String, List<Expense>> grouped = {};
+    // 1. Gabungkan
+    List<dynamic> allData = [];
+    allData.addAll(expenses);
+    allData.addAll(incomes);
 
-    for (var item in expenses) {
-      String dateKey =
-          DateFormat('dd MMM yyyy').format(item.tanggal);
+    // 2. Sort Tanggal
+    allData.sort((a, b) {
+      DateTime dtA = (a is Expense) ? a.tanggal : DateTime.parse(a['created_at']);
+      DateTime dtB = (b is Expense) ? b.tanggal : DateTime.parse(b['created_at']);
+      return dtB.compareTo(dtA);
+    });
 
-      grouped.putIfAbsent(dateKey, () => []);
-      grouped[dateKey]!.add(item);
+    Map<String, List<dynamic>> grouped = {};
+    for (var item in allData) {
+      DateTime dt = (item is Expense) ? item.tanggal : DateTime.parse(item['created_at']);
+      String key = DateFormat('dd MMMM yyyy').format(dt);
+      grouped.putIfAbsent(key, () => []);
+      grouped[key]!.add(item);
     }
 
     List<Widget> widgets = [];
-
     grouped.forEach((date, items) {
       widgets.add(
         Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Text(
-            date,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          padding: const EdgeInsets.only(top: 15, bottom: 8, left: 4),
+          child: Text(date, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
         ),
       );
 
       for (var item in items) {
+        bool isExpense = item is Expense;
+        String title = isExpense ? item.nama : "Top Up Balance";
+        double val = isExpense ? item.harga : (item['nilai'] ?? 0).toDouble();
+        String category = isExpense ? item.kategori : "Income";
+        String hour = DateFormat('HH:mm').format(isExpense ? item.tanggal : DateTime.parse(item['created_at']));
+
         widgets.add(
           Card(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15)),
+            elevation: 0,
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor:
-                    getCategoryColor(item.kategori),
-                child: Text(
-                  item.kategori[0],
-                  style:
-                      const TextStyle(color: Colors.white),
+                backgroundColor: isExpense ? getCategoryColor(category).withOpacity(0.2) : Colors.green.withOpacity(0.2),
+                child: Icon(
+                  isExpense ? Icons.shopping_bag_outlined : Icons.account_balance_wallet_outlined,
+                  color: isExpense ? getCategoryColor(category) : Colors.green.shade700,
                 ),
               ),
-              title: Text(item.nama),
-              subtitle: Text(
-                  DateFormat('HH:mm').format(item.tanggal)),
+              title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(hour, style: const TextStyle(fontSize: 12)),
               trailing: Text(
-                "- ${rupiah.format(item.harga)}",
-                style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold),
+                isExpense ? "- ${rupiah.format(val)}" : "+ ${rupiah.format(val)}",
+                style: TextStyle(
+                  color: isExpense ? Colors.red.shade700 : Colors.green.shade700,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
             ),
           ),
         );
       }
     });
+
+    if (allData.isEmpty) {
+      widgets.add(const Center(child: Padding(
+        padding: EdgeInsets.all(40.0),
+        child: Text("No transactions yet"),
+      )));
+    }
 
     return widgets;
   }
