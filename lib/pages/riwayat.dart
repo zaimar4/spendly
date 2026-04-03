@@ -76,8 +76,8 @@ class _HistoryPageState extends State<HistoryPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF2F3F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F6B73),
         elevation: 0,
+      backgroundColor: const Color(0xFFF2F3F5),
         centerTitle: true,
         title: const Text(
           "Transaction History",
@@ -122,7 +122,6 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
                 const SizedBox(height: 10),
 
-                // DAFTAR TRANSAKSI GABUNGAN
                 ..._groupedTransactions(),
               ],
             ),

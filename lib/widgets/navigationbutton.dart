@@ -45,7 +45,7 @@ class Navigationbutton extends StatelessWidget {
         ),
         SpeedDialChild(
           child: Icon(Icons.history, color: Colors.green),
-          label: "Expense History",
+          label: "History",
           backgroundColor: Colors.white,
           foregroundColor: Colors.green,
           onTap: historPage,

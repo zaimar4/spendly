@@ -5,11 +5,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
-  // 1. Pastikan binding Flutter sudah siap
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // 2. Load file .env
     await dotenv.load(fileName: ".env");
 
     await initializeDateFormatting('id_ID', null);

@@ -11,7 +11,7 @@ class ExpenseService {
     final data = await supabase
         .from('expenses')
         .select('id, nama_expense, harga, kategori, created_at')
-        .eq('user_id', user!.id)
+        .eq('user_id', user.id)
         .order('created_at', ascending: false);
 
     return (data as List).map((item) => Expense.fromJson(item)).toList();
@@ -49,7 +49,6 @@ Future<void> addBalance({required double nilai}) async {
     'nilai': nilai,
   });
 }
-// Di dalam class ExpenseService
 Future<List<Map<String, dynamic>>> getIncomes() async {
   try {
     final user = supabase.auth.currentUser;
@@ -67,6 +66,21 @@ Future<List<Map<String, dynamic>>> getIncomes() async {
     print("Error Get Incomes: $e");
     return [];
   }
+}
+Future<double> getTotalIncome() async {
+  final user = supabase.auth.currentUser;
+  if (user == null) return 0;
+
+  final data = await supabase
+      .from('income')
+      .select('nilai')
+      .eq('user_id', user.id);
+
+  double total = 0;
+  for (var item in data) {
+    total += (item['nilai'] as num).toDouble();
+  }
+  return total;
 }
   }
 
