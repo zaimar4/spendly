@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:la_logika/models/Expense.dart';
-import 'package:la_logika/models/categoriModel.dart';
 import 'package:la_logika/pages/addexpense.dart';
 import 'package:la_logika/pages/login.dart';
 import 'package:la_logika/pages/riwayat.dart';
+import 'package:la_logika/pages/stastistik.dart';
 import 'package:la_logika/service/expense_service.dart';
 import 'package:la_logika/widgets/Expenses.dart';
 import 'package:la_logika/widgets/balanceCart.dart';
@@ -13,7 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Home extends StatefulWidget {
   final String namaUser;
-  final double balance; // Ini saldo awal saat pendaftaran/login
+  final double balance;
 
   const Home({super.key, required this.namaUser, required this.balance});
 
@@ -22,7 +22,7 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  late double currentbalance; // Kita gunakan ini untuk menyimpan (Balance Awal + Total Income)
+  late double currentbalance;
   int selectedIndex = 0;
   List<String> categories = ["All", "Primary", "Secondary", "Lifestyle"];
   List<Expense> expense = [];
@@ -33,17 +33,15 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     currentbalance = widget.balance;
-    refreshAllData(); // Ambil semua data saat pertama kali buka
+    refreshAllData();
   }
 
-  // FUNGSI UTAMA: Mengambil data pengeluaran DAN tambahan saldo terbaru dari DB
   void refreshAllData() async {
     final expensesData = await expense_service.getExpenses();
     final totalTambahanSaldo = await expense_service.getTotalIncome();
-    
+
     setState(() {
       expense = expensesData;
-      // Saldo dasar + semua topup yang ada di tabel income
       currentbalance = widget.balance + totalTambahanSaldo;
     });
   }
@@ -54,7 +52,7 @@ class _HomeState extends State<Home> {
 
   Future<void> deleteExpense(String id) async {
     await expense_service.deleteExpense(id);
-    refreshAllData(); 
+    refreshAllData();
   }
 
   Future<void> Addbalance() async {
@@ -63,11 +61,11 @@ class _HomeState extends State<Home> {
       if (jumlah <= 0) return;
 
       await expense_service.addBalance(nilai: jumlah);
-      
+
       addBalanceController.clear();
       if (mounted) Navigator.pop(context);
-      
-      refreshAllData(); // Refresh untuk mendapatkan currentbalance terbaru dari DB
+
+      refreshAllData();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Saldo berhasil ditambahkan!")),
@@ -77,7 +75,7 @@ class _HomeState extends State<Home> {
     }
   }
 
-  // --- Fungsi Navigasi ---
+  // --- Navigasi ---
   void addExpense() async {
     final result = await Navigator.push(
       context, MaterialPageRoute(builder: (context) => const Addexpense()),
@@ -86,15 +84,25 @@ class _HomeState extends State<Home> {
   }
 
   void historyRoute() async {
-    await Navigator.push(context, MaterialPageRoute(builder: (context) => const HistoryPage()));
-    refreshAllData(); // Refresh saat balik dari halaman riwayat
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (context) => const HistoryPage()));
+    refreshAllData();
+  }
+
+ 
+  void statistikRoute() async {
+    await Navigator.push(
+        context, MaterialPageRoute(builder: (context) => const StatistikPage()));
+    refreshAllData();
   }
 
   void Logout() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
-      context, MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false,
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
     );
   }
 
@@ -106,13 +114,19 @@ class _HomeState extends State<Home> {
         content: TextField(
           controller: addBalanceController,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: "Input Saldo", prefixText: "Rp ", border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+              hintText: "Input Saldo",
+              prefixText: "Rp ",
+              border: OutlineInputBorder()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel")),
           ElevatedButton(
             onPressed: Addbalance,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green, foregroundColor: Colors.white),
             child: const Text('Add'),
           ),
         ],
@@ -124,7 +138,9 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     List<Expense> filteredExpenses = selectedIndex == 0
         ? expense
-        : expense.where((item) => item.kategori == categories[selectedIndex]).toList();
+        : expense
+            .where((item) => item.kategori == categories[selectedIndex])
+            .toList();
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 248, 255, 249),
@@ -133,6 +149,7 @@ class _HomeState extends State<Home> {
         addExpenses: addExpense,
         addBalance: showBalancepopup,
         historPage: historyRoute,
+        statistikPage: statistikRoute, // ← TAMBAH INI
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,7 +157,10 @@ class _HomeState extends State<Home> {
           const SizedBox(height: 50),
           Padding(
             padding: const EdgeInsets.only(left: 15),
-            child: Text("Hello, ${widget.namaUser} 👋", style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w500)),
+            child: Text(
+              "Hello, ${widget.namaUser} 👋",
+              style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w500),
+            ),
           ),
           const SizedBox(height: 25),
           Padding(
@@ -152,7 +172,6 @@ class _HomeState extends State<Home> {
             ),
           ),
           const SizedBox(height: 15),
-          // Filter Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(categories.length, (index) {
@@ -169,7 +188,8 @@ class _HomeState extends State<Home> {
                 ? const Center(child: Text("No items found"))
                 : Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Expenses(items: filteredExpenses, onDeleted: refreshAllData),
+                    child: Expenses(
+                        items: filteredExpenses, onDeleted: refreshAllData),
                   ),
           ),
         ],

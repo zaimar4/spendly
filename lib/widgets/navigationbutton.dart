@@ -5,6 +5,7 @@ class Navigationbutton extends StatelessWidget {
   final VoidCallback addExpenses;
   final VoidCallback addBalance;
   final VoidCallback historPage;
+  final VoidCallback statistikPage;
   final VoidCallback logout;
 
   const Navigationbutton({
@@ -12,6 +13,7 @@ class Navigationbutton extends StatelessWidget {
     required this.addExpenses,
     required this.addBalance,
     required this.historPage,
+    required this.statistikPage,
     required this.logout
   });
 
@@ -49,6 +51,13 @@ class Navigationbutton extends StatelessWidget {
           backgroundColor: Colors.white,
           foregroundColor: Colors.green,
           onTap: historPage,
+        ),
+        SpeedDialChild(
+          child: Icon(Icons.bar_chart, color: Colors.green),
+          label: "Statistics",
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.green,
+          onTap: statistikPage,
         ),
       ],
     );
