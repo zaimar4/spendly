@@ -183,6 +183,11 @@ class _HomeState extends State<Home> {
             }),
           ),
           const SizedBox(height: 15),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text("Recent Expenses", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 15,),
           Expanded(
             child: filteredExpenses.isEmpty
                 ? const Center(child: Text("No items found"))

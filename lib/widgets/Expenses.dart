@@ -16,7 +16,7 @@ class Expenses extends StatelessWidget {
         return Icons.home_outlined;
       case "Secondary":
         return Icons.shopping_bag_outlined;
-      case "Lifestyle": // Perhatikan case-sensitive: Lifestyle (L besar)
+      case "Lifestyle":
         return Icons.sports_esports_outlined;
       default:
         return Icons.category_outlined;
@@ -81,10 +81,10 @@ class Expenses extends StatelessWidget {
             ),
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: const CircleAvatar(
+              leading:  CircleAvatar(
                 radius: 22,
                 backgroundColor: Color.fromARGB(255, 76, 175, 80),
-                child: Icon(Icons.receipt_long, color: Colors.white), // Atau gunakan getIconkategori
+                child: Icon(getIconkategori(item.kategori),color: Colors.white,), 
               ),
               title: Text(item.nama),
               subtitle: Text(dateFormat.format(item.tanggal)),

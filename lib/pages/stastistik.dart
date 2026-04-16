@@ -4,8 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:la_logika/models/Expense.dart';
 import 'package:la_logika/service/expense_service.dart';
 
-// Reuse enum yang sama dari riwayat.dart (atau buat file terpisah)
-enum StatPeriod { today, thisWeek, thisMonth, lastMonth }
+// Mode filter yang tersedia
+enum StatPeriod { all, today, thisWeek, thisMonth, lastMonth }
 
 class StatistikPage extends StatefulWidget {
   const StatistikPage({super.key});
@@ -20,7 +20,7 @@ class _StatistikPageState extends State<StatistikPage> {
   List<Expense> allExpenses = [];
   bool isLoading = true;
   StatPeriod selectedPeriod = StatPeriod.thisMonth;
-  int touchedIndex = -1; // untuk interaksi pie chart
+  int touchedIndex = -1;
 
   final rupiah = NumberFormat.currency(
     locale: 'id_ID',
@@ -28,17 +28,22 @@ class _StatistikPageState extends State<StatistikPage> {
     decimalDigits: 0,
   );
 
-  // Warna per kategori — konsisten dengan riwayat.dart
   final Map<String, Color> categoryColors = {
     "Primary": const Color(0xFF2E7D32),
     "Secondary": const Color(0xFF66BB6A),
     "Lifestyle": const Color(0xFF1B5E20),
   };
 
-  final List<Color> trendColors = [
+  final List<Color> fallbackColors = [
     const Color(0xFF43A047),
     const Color(0xFF1B5E20),
     const Color(0xFF66BB6A),
+  ];
+
+  final List<String> _bulanNames = [
+    "Januari", "Februari", "Maret", "April",
+    "Mei", "Juni", "Juli", "Agustus",
+    "September", "Oktober", "November", "Desember",
   ];
 
   @override
@@ -61,34 +66,42 @@ class _StatistikPageState extends State<StatistikPage> {
     }
   }
 
-  // ===== FILTER RANGE =====
-  DateTimeRange get _filterRange {
+  // ===== FILTER RANGE — null = All =====
+  DateTimeRange? get _filterRange {
     final now = DateTime.now();
     switch (selectedPeriod) {
+      case StatPeriod.all:
+        return null;
+
       case StatPeriod.today:
         final start = DateTime(now.year, now.month, now.day);
         return DateTimeRange(start: start, end: start.add(const Duration(days: 1)));
+
       case StatPeriod.thisWeek:
         final monday = now.subtract(Duration(days: now.weekday - 1));
         final start = DateTime(monday.year, monday.month, monday.day);
         return DateTimeRange(start: start, end: start.add(const Duration(days: 7)));
+
       case StatPeriod.thisMonth:
         return DateTimeRange(
           start: DateTime(now.year, now.month, 1),
           end: DateTime(now.year, now.month + 1, 1),
         );
+
       case StatPeriod.lastMonth:
-        final lm = now.month == 1 ? 12 : now.month - 1;
-        final ly = now.month == 1 ? now.year - 1 : now.year;
+        final lastMonthDate = DateTime(now.year, now.month - 1, 1);
+        final nextMonth = lastMonthDate.month == 12 ? 1 : lastMonthDate.month + 1;
+        final nextYear = lastMonthDate.month == 12 ? lastMonthDate.year + 1 : lastMonthDate.year;
         return DateTimeRange(
-          start: DateTime(ly, lm, 1),
-          end: DateTime(now.year, now.month, 1),
+          start: DateTime(lastMonthDate.year, lastMonthDate.month, 1),
+          end: DateTime(nextYear, nextMonth, 1),
         );
     }
   }
 
   List<Expense> get _filteredExpenses {
     final range = _filterRange;
+    if (range == null) return List.from(allExpenses);
     return allExpenses
         .where((e) => e.tanggal.isAfter(range.start) && e.tanggal.isBefore(range.end))
         .toList();
@@ -97,7 +110,6 @@ class _StatistikPageState extends State<StatistikPage> {
   double get _totalPengeluaran =>
       _filteredExpenses.fold(0, (sum, e) => sum + e.harga);
 
-  // ===== DATA PER KATEGORI =====
   Map<String, double> get _byCategory {
     final Map<String, double> map = {};
     for (var e in _filteredExpenses) {
@@ -106,32 +118,26 @@ class _StatistikPageState extends State<StatistikPage> {
     return map;
   }
 
-  // ===== DATA TREN (per hari atau per bulan) =====
-  // Untuk "hari ini" & "minggu ini" → per hari
-  // Untuk "bulan ini" & "bulan lalu" → per hari dalam bulan
+  // Tren: per jam (today), per hari (week), per tanggal (month/pickMonth), per bulan (all)
   Map<String, double> get _trendData {
-    final range = _filterRange;
-    final bool byDay = selectedPeriod == StatPeriod.today ||
-        selectedPeriod == StatPeriod.thisWeek ||
-        selectedPeriod == StatPeriod.thisMonth ||
-        selectedPeriod == StatPeriod.lastMonth;
-
     Map<String, double> map = {};
-
     if (selectedPeriod == StatPeriod.today) {
-      // Per jam
       for (var e in _filteredExpenses) {
         final key = DateFormat('HH:00').format(e.tanggal);
         map[key] = (map[key] ?? 0) + e.harga;
       }
     } else if (selectedPeriod == StatPeriod.thisWeek) {
-      // Per hari (Sen–Min)
       for (var e in _filteredExpenses) {
         final key = DateFormat('EEE\nd MMM').format(e.tanggal);
         map[key] = (map[key] ?? 0) + e.harga;
       }
+    } else if (selectedPeriod == StatPeriod.all) {
+      // Per bulan — "Jan 2024"
+      for (var e in _filteredExpenses) {
+        final key = DateFormat('MMM yyyy').format(e.tanggal);
+        map[key] = (map[key] ?? 0) + e.harga;
+      }
     } else {
-      // Per tanggal dalam bulan
       for (var e in _filteredExpenses) {
         final key = DateFormat('dd MMM').format(e.tanggal);
         map[key] = (map[key] ?? 0) + e.harga;
@@ -140,22 +146,16 @@ class _StatistikPageState extends State<StatistikPage> {
     return map;
   }
 
-  // ===== INSIGHT: kategori terbesar =====
   String get _biggestCategory {
     if (_byCategory.isEmpty) return "—";
-    return _byCategory.entries
-        .reduce((a, b) => a.value > b.value ? a : b)
-        .key;
+    return _byCategory.entries.reduce((a, b) => a.value > b.value ? a : b).key;
   }
 
   double get _biggestCategoryAmount {
     if (_byCategory.isEmpty) return 0;
-    return _byCategory.entries
-        .reduce((a, b) => a.value > b.value ? a : b)
-        .value;
+    return _byCategory.entries.reduce((a, b) => a.value > b.value ? a : b).value;
   }
 
-  // Persen kategori terbesar
   double get _biggestCategoryPercent {
     if (_totalPengeluaran == 0) return 0;
     return (_biggestCategoryAmount / _totalPengeluaran) * 100;
@@ -165,10 +165,14 @@ class _StatistikPageState extends State<StatistikPage> {
 
   String get _periodLabel {
     switch (selectedPeriod) {
-      case StatPeriod.today:      return "Hari Ini";
-      case StatPeriod.thisWeek:   return "Minggu Ini";
-      case StatPeriod.thisMonth:  return "Bulan Ini";
-      case StatPeriod.lastMonth:  return "Bulan Lalu";
+      case StatPeriod.all:       return "Semua Waktu";
+      case StatPeriod.today:     return "Hari Ini";
+      case StatPeriod.thisWeek:  return "Minggu Ini";
+      case StatPeriod.thisMonth: return "Bulan Ini";
+      case StatPeriod.lastMonth: 
+        final now = DateTime.now();
+        final lastMonth = DateTime(now.year, now.month - 1, 1);
+        return "${_bulanNames[lastMonth.month - 1]} ${lastMonth.year}";
     }
   }
 
@@ -190,7 +194,7 @@ class _StatistikPageState extends State<StatistikPage> {
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,
             tooltip: "Refresh",
-          )
+          ),
         ],
       ),
       body: isLoading
@@ -200,31 +204,20 @@ class _StatistikPageState extends State<StatistikPage> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // ===== FILTER ROW =====
                   _buildFilterRow(),
                   const SizedBox(height: 20),
-
-                  // ===== TOTAL SUMMARY =====
                   _buildTotalCard(),
                   const SizedBox(height: 20),
-
-                  // ===== INSIGHT CARDS =====
                   _buildInsightRow(),
                   const SizedBox(height: 20),
-
-                  // ===== PIE CHART =====
                   _buildSectionTitle("Pengeluaran per Kategori"),
                   const SizedBox(height: 12),
                   _buildPieChart(),
                   const SizedBox(height: 24),
-
-                  // ===== TREN CHART =====
                   _buildSectionTitle("Tren Pengeluaran"),
                   const SizedBox(height: 12),
                   _buildTrendChart(),
                   const SizedBox(height: 24),
-
-                  // ===== BREAKDOWN KATEGORI =====
                   _buildSectionTitle("Rincian per Kategori"),
                   const SizedBox(height: 12),
                   _buildCategoryBreakdown(),
@@ -237,9 +230,10 @@ class _StatistikPageState extends State<StatistikPage> {
 
   // ===== FILTER ROW =====
   Widget _buildFilterRow() {
-    final filters = [
-      (StatPeriod.today, "Hari Ini"),
-      (StatPeriod.thisWeek, "Minggu Ini"),
+    final staticFilters = [
+      (StatPeriod.all,       "All"),
+      (StatPeriod.today,     "Hari Ini"),
+      (StatPeriod.thisWeek,  "Minggu Ini"),
       (StatPeriod.thisMonth, "Bulan Ini"),
       (StatPeriod.lastMonth, "Bulan Lalu"),
     ];
@@ -247,7 +241,7 @@ class _StatistikPageState extends State<StatistikPage> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: filters.map((entry) {
+        children: staticFilters.map((entry) {
           final period = entry.$1;
           final label = entry.$2;
           final isSelected = selectedPeriod == period;
@@ -259,31 +253,38 @@ class _StatistikPageState extends State<StatistikPage> {
                 selectedPeriod = period;
                 touchedIndex = -1;
               }),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.green.shade700 : Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: isSelected ? Colors.green.shade700 : Colors.grey.shade300,
-                  ),
-                  boxShadow: isSelected
-                      ? [BoxShadow(color: Colors.green.shade200, blurRadius: 8, offset: const Offset(0, 3))]
-                      : [],
-                ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey.shade700,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
+              child: _filterChip(label: label, isSelected: isSelected),
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _filterChip({
+    required String label,
+    required bool isSelected,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.green.shade700 : Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: isSelected ? Colors.green.shade700 : Colors.grey.shade300,
+        ),
+        boxShadow: isSelected
+            ? [BoxShadow(color: Colors.green.shade200, blurRadius: 8, offset: const Offset(0, 3))]
+            : [],
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.grey.shade700,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 13,
+        ),
       ),
     );
   }
@@ -307,8 +308,10 @@ class _StatistikPageState extends State<StatistikPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Total Pengeluaran – $_periodLabel",
-              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          Text(
+            "Total Pengeluaran – $_periodLabel",
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
           const SizedBox(height: 8),
           FittedBox(
             child: Text(
@@ -378,8 +381,7 @@ class _StatistikPageState extends State<StatistikPage> {
           Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 11)),
           const SizedBox(height: 4),
           Text(value,
-              style: TextStyle(
-                  color: iconColor, fontWeight: FontWeight.bold, fontSize: 16)),
+              style: TextStyle(color: iconColor, fontWeight: FontWeight.bold, fontSize: 16)),
           Text(sub, style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
         ],
       ),
@@ -389,11 +391,7 @@ class _StatistikPageState extends State<StatistikPage> {
   // ===== PIE CHART =====
   Widget _buildPieChart() {
     final byCategory = _byCategory;
-
-    if (byCategory.isEmpty) {
-      return _emptyChart("Tidak ada data untuk ditampilkan");
-    }
-
+    if (byCategory.isEmpty) return _emptyChart("Tidak ada data untuk ditampilkan");
     final categories = byCategory.keys.toList();
 
     return Container(
@@ -417,8 +415,7 @@ class _StatistikPageState extends State<StatistikPage> {
                             touchedIndex = -1;
                             return;
                           }
-                          touchedIndex =
-                              response.touchedSection!.touchedSectionIndex;
+                          touchedIndex = response.touchedSection!.touchedSectionIndex;
                         });
                       },
                     ),
@@ -427,10 +424,9 @@ class _StatistikPageState extends State<StatistikPage> {
                     sections: List.generate(categories.length, (i) {
                       final cat = categories[i];
                       final val = byCategory[cat]!;
-                      final pct =
-                          _totalPengeluaran > 0 ? val / _totalPengeluaran * 100 : 0.0;
+                      final pct = _totalPengeluaran > 0 ? val / _totalPengeluaran * 100 : 0.0;
                       final isTouched = touchedIndex == i;
-                      final color = categoryColors[cat] ?? trendColors[i % trendColors.length];
+                      final color = categoryColors[cat] ?? fallbackColors[i % fallbackColors.length];
 
                       return PieChartSectionData(
                         color: color,
@@ -438,14 +434,11 @@ class _StatistikPageState extends State<StatistikPage> {
                         title: "${pct.toStringAsFixed(1)}%",
                         radius: isTouched ? 75 : 60,
                         titleStyle: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold),
+                            color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                       );
                     }),
                   ),
                 ),
-                // Label tengah
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -463,7 +456,6 @@ class _StatistikPageState extends State<StatistikPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // Legend
           Wrap(
             spacing: 16,
             runSpacing: 8,
@@ -473,7 +465,10 @@ class _StatistikPageState extends State<StatistikPage> {
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                  Container(
+                    width: 12, height: 12,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  ),
                   const SizedBox(width: 6),
                   Text(cat, style: const TextStyle(fontSize: 12)),
                 ],
@@ -485,13 +480,10 @@ class _StatistikPageState extends State<StatistikPage> {
     );
   }
 
-  // ===== TREND CHART (Bar Chart) =====
+  // ===== TREND CHART =====
   Widget _buildTrendChart() {
     final trendData = _trendData;
-
-    if (trendData.isEmpty) {
-      return _emptyChart("Tidak ada data tren");
-    }
+    if (trendData.isEmpty) return _emptyChart("Tidak ada data tren");
 
     final keys = trendData.keys.toList()..sort();
     final maxVal = trendData.values.reduce((a, b) => a > b ? a : b);
@@ -499,95 +491,87 @@ class _StatistikPageState extends State<StatistikPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 20, 20, 12),
       decoration: _cardDecoration(),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 180,
-            child: BarChart(
-              BarChartData(
-                maxY: maxVal * 1.3,
-                barTouchData: BarTouchData(
-                  enabled: true,
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) => Colors.green.shade800,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      return BarTooltipItem(
-                        rupiah.format(rod.toY),
-                        const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                      );
-                    },
-                  ),
+      child: SizedBox(
+        height: 180,
+        child: BarChart(
+          BarChartData(
+            maxY: maxVal * 1.3,
+            barTouchData: BarTouchData(
+              enabled: true,
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipColor: (_) => Colors.green.shade800,
+                getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
+                  rupiah.format(rod.toY),
+                  const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 52,
-                      getTitlesWidget: (val, _) {
-                        if (val == 0) return const Text('');
-                        String label;
-                        if (val >= 1000000) {
-                          label = "${(val / 1000000).toStringAsFixed(1)}jt";
-                        } else if (val >= 1000) {
-                          label = "${(val / 1000).toStringAsFixed(0)}rb";
-                        } else {
-                          label = val.toStringAsFixed(0);
-                        }
-                        return Text(label,
-                            style: const TextStyle(fontSize: 9, color: Colors.grey));
-                      },
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      getTitlesWidget: (val, _) {
-                        final idx = val.toInt();
-                        if (idx < 0 || idx >= keys.length) return const Text('');
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            keys[idx],
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 9, color: Colors.grey),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) =>
-                      FlLine(color: Colors.grey.shade200, strokeWidth: 1),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: List.generate(keys.length, (i) {
-                  return BarChartGroupData(
-                    x: i,
-                    barRods: [
-                      BarChartRodData(
-                        toY: trendData[keys[i]]!,
-                        color: Colors.green.shade600,
-                        width: _barWidth(keys.length),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                        backDrawRodData: BackgroundBarChartRodData(
-                          show: true,
-                          toY: maxVal * 1.3,
-                          color: Colors.grey.shade100,
-                        ),
-                      ),
-                    ],
-                  );
-                }),
               ),
             ),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 52,
+                  getTitlesWidget: (val, _) {
+                    if (val == 0) return const Text('');
+                    String label;
+                    if (val >= 1000000) {
+                      label = "${(val / 1000000).toStringAsFixed(1)}jt";
+                    } else if (val >= 1000) {
+                      label = "${(val / 1000).toStringAsFixed(0)}rb";
+                    } else {
+                      label = val.toStringAsFixed(0);
+                    }
+                    return Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey));
+                  },
+                ),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 30,
+                  getTitlesWidget: (val, _) {
+                    final idx = val.toInt();
+                    if (idx < 0 || idx >= keys.length) return const Text('');
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        keys[idx],
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 9, color: Colors.grey),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade200, strokeWidth: 1),
+            ),
+            borderData: FlBorderData(show: false),
+            barGroups: List.generate(keys.length, (i) {
+              return BarChartGroupData(
+                x: i,
+                barRods: [
+                  BarChartRodData(
+                    toY: trendData[keys[i]]!,
+                    color: Colors.green.shade600,
+                    width: _barWidth(keys.length),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                    backDrawRodData: BackgroundBarChartRodData(
+                      show: true,
+                      toY: maxVal * 1.3,
+                      color: Colors.grey.shade100,
+                    ),
+                  ),
+                ],
+              );
+            }),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -601,9 +585,7 @@ class _StatistikPageState extends State<StatistikPage> {
   // ===== CATEGORY BREAKDOWN =====
   Widget _buildCategoryBreakdown() {
     final byCategory = _byCategory;
-    if (byCategory.isEmpty) {
-      return _emptyChart("Tidak ada data");
-    }
+    if (byCategory.isEmpty) return _emptyChart("Tidak ada data");
 
     final sorted = byCategory.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -624,17 +606,15 @@ class _StatistikPageState extends State<StatistikPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 10, height: 10,
-                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(entry.key,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                      ],
-                    ),
+                    Row(children: [
+                      Container(
+                        width: 10, height: 10,
+                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(entry.key,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    ]),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -664,7 +644,7 @@ class _StatistikPageState extends State<StatistikPage> {
     );
   }
 
-  // ===== HELPER WIDGETS =====
+  // ===== HELPERS =====
   Widget _buildSectionTitle(String title) {
     return Text(title,
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87));
