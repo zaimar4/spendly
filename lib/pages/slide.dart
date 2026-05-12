@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:la_logika/pages/login.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Slide extends StatefulWidget {
   const Slide({super.key});
@@ -34,15 +35,21 @@ class _SlideState extends State<Slide> {
       curve: Curves.easeInOut,
     );
   }
+void finishOnboarding() async {
+  final prefs = await SharedPreferences.getInstance();
 
-  void finishOnboarding() {
-    // Navigasi yang aman: menghapus semua history slide agar tidak bisa back
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-      (route) => false,
-    );
-  }
+  await prefs.setBool('isFirstTime', false); // 🔥 INI YANG KURANG
+
+  print("🔥 onboarding selesai disimpan");
+
+  if (!mounted) return;
+
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (context) => const LoginPage()),
+    (route) => false,
+  );
+}
 
   @override
   Widget build(BuildContext context) {

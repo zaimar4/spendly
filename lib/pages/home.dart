@@ -12,10 +12,10 @@ import 'package:la_logika/widgets/navigationbutton.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Home extends StatefulWidget {
-  final String namaUser;
-  final double balance;
+  final String? namaUser;
+  final double? balance;
 
-  const Home({super.key, required this.namaUser, required this.balance});
+  const Home({super.key, this.namaUser, this.balance});
 
   @override
   State<Home> createState() => _HomeState();
@@ -23,6 +23,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   late double currentbalance;
+
   int selectedIndex = 0;
   List<String> categories = ["All", "Primary", "Secondary", "Lifestyle"];
   List<Expense> expense = [];
@@ -32,7 +33,10 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    currentbalance = widget.balance;
+
+    // 🔥 aman dari null
+    currentbalance = widget.balance ?? 0;
+
     refreshAllData();
   }
 
@@ -40,9 +44,13 @@ class _HomeState extends State<Home> {
     final expensesData = await expense_service.getExpenses();
     final totalTambahanSaldo = await expense_service.getTotalIncome();
 
+    if (!mounted) return;
+
     setState(() {
       expense = expensesData;
-      currentbalance = widget.balance + totalTambahanSaldo;
+
+      // 🔥 balance = balance awal + tambahan saldo
+      currentbalance = (widget.balance ?? 0) + totalTambahanSaldo;
     });
   }
 
@@ -78,27 +86,37 @@ class _HomeState extends State<Home> {
   // --- Navigasi ---
   void addExpense() async {
     final result = await Navigator.push(
-      context, MaterialPageRoute(builder: (context) => const Addexpense()),
+      context,
+      MaterialPageRoute(builder: (context) => const Addexpense()),
     );
-    if (result == true) refreshAllData();
+
+    if (result != null && result is Expense) {
+      setState(() {
+        expense.insert(0, result);
+      });
+    }
   }
 
   void historyRoute() async {
     await Navigator.push(
-        context, MaterialPageRoute(builder: (context) => const HistoryPage()));
+      context,
+      MaterialPageRoute(builder: (context) => const HistoryPage()),
+    );
     refreshAllData();
   }
 
- 
   void statistikRoute() async {
     await Navigator.push(
-        context, MaterialPageRoute(builder: (context) => const StatistikPage()));
+      context,
+      MaterialPageRoute(builder: (context) => const StatistikPage()),
+    );
     refreshAllData();
   }
 
   void Logout() async {
     await Supabase.instance.client.auth.signOut();
     if (!mounted) return;
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -115,18 +133,22 @@ class _HomeState extends State<Home> {
           controller: addBalanceController,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-              hintText: "Input Saldo",
-              prefixText: "Rp ",
-              border: OutlineInputBorder()),
+            hintText: "Input Saldo",
+            prefixText: "Rp ",
+            border: OutlineInputBorder(),
+          ),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel")),
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
             onPressed: Addbalance,
             style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green, foregroundColor: Colors.white),
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Add'),
           ),
         ],
@@ -149,29 +171,34 @@ class _HomeState extends State<Home> {
         addExpenses: addExpense,
         addBalance: showBalancepopup,
         historPage: historyRoute,
-        statistikPage: statistikRoute, // ← TAMBAH INI
+        statistikPage: statistikRoute,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 50),
+
           Padding(
             padding: const EdgeInsets.only(left: 15),
             child: Text(
-              "Hello, ${widget.namaUser} 👋",
+              "Hello, ${widget.namaUser ?? 'User'} 👋",
               style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w500),
             ),
           ),
+
           const SizedBox(height: 25),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: BalanceCard(
-              currentBalance: currentbalance - totalPengeluaran,
+              currentBalance: currentbalance - totalPengeluaran, // 🔥 fix
               totalExpense: totalPengeluaran,
               initialBalance: currentbalance,
             ),
           ),
+
           const SizedBox(height: 15),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(categories.length, (index) {
@@ -182,19 +209,26 @@ class _HomeState extends State<Home> {
               );
             }),
           ),
+
           const SizedBox(height: 15),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text("Recent Expenses", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+            child: Text(
+              "Recent Expenses",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
           ),
-          const SizedBox(height: 15,),
+
           Expanded(
             child: filteredExpenses.isEmpty
                 ? const Center(child: Text("No items found"))
                 : Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12.0),
                     child: Expenses(
-                        items: filteredExpenses, onDeleted: refreshAllData),
+                      items: filteredExpenses,
+                      onDeleted: refreshAllData,
+                    ),
                   ),
           ),
         ],

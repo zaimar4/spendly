@@ -15,12 +15,13 @@ class _Register_PageState extends State<Register_Page> {
   final TextEditingController nama = TextEditingController();
   final TextEditingController email = TextEditingController();
   final TextEditingController password = TextEditingController();
+  final TextEditingController balance = TextEditingController();
 
   bool isLoading = false;
 
   Future<void> register() async {
     // 1. Validasi awal: pastikan semua field terisi
-    if (email.text.isEmpty || password.text.isEmpty || nama.text.isEmpty) {
+    if (email.text.isEmpty || password.text.isEmpty || nama.text.isEmpty || balance.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Semua data harus diisi ya!")),
       );
@@ -45,7 +46,7 @@ class _Register_PageState extends State<Register_Page> {
       await supabase.from('profiles').insert({
         'id': user.id,
         'nama': nama.text.trim(),
-        'balance': 0, // Set saldo awal otomatis 0
+        'balance': double.parse(balance.text), // Set saldo awal otomatis 0
       });
 
       if (!mounted) return;
@@ -157,6 +158,17 @@ class _Register_PageState extends State<Register_Page> {
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.lock_outline),
                   hintText: "Password (Min. 6 Karakter)",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Field Password
+              TextField(
+                controller: balance,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                  hintText: "Saldo Awal",
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
                 ),
               ),

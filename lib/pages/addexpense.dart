@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:la_logika/models/Expense.dart';
 import 'package:la_logika/service/expense_service.dart';
 import 'package:la_logika/widgets/Categorycard.dart';
 import 'package:la_logika/widgets/InputExpense.dart';
@@ -20,25 +21,35 @@ class _AddexpenseState extends State<Addexpense> {
   final supabase = Supabase.instance.client;
   final expenseService = ExpenseService();
 
-  Future<void> addExpense() async {
-    try {
-      if (namaExpense.text.isEmpty ||
-          hargaExpense.text.isEmpty ||
-          selectedCategory.isEmpty) {
-        throw Exception("All Field Must be Filled in");
-      }
-     expenseService.addExpense(nama: namaExpense.text.trim(), harga:double.tryParse(hargaExpense.text) ?? 0, kategori: selectedCategory);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Expense added succesfully")),
-      );
-      Navigator.pop(context, true);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("New expense fail to added : ${e}")),
-      );
+Future<void> addExpense() async {
+  try {
+    if (namaExpense.text.isEmpty ||
+        hargaExpense.text.isEmpty ||
+        selectedCategory.isEmpty) {
+      throw Exception("All Field Must be Filled in");
     }
-  }
 
+    final newExpense = Expense(
+      id: '', // sementara kosong
+      nama: namaExpense.text.trim(),
+      harga: double.tryParse(hargaExpense.text) ?? 0,
+      kategori: selectedCategory,
+      tanggal: DateTime.now()
+    );
+
+    await expenseService.addExpense(
+      nama: newExpense.nama,
+      harga: newExpense.harga,
+      kategori: newExpense.kategori,
+    );
+
+    Navigator.pop(context, newExpense); // 🔥 kirim data, bukan true
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("New expense fail: $e")),
+    );
+  }
+}
   void selectCategory(String category) {
     setState(() {
       selectedCategory = category;
